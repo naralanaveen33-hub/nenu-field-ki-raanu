@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --background: #f8f9f6;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --primary: #15803d;
+  --primary-foreground: #ffffff;
+  --border: #e2e8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0d1512;
+    --foreground: #f1f5f9;
+    --card: #13201a;
+    --card-foreground: #f8fafc;
+    --primary: #22c55e;
+    --primary-foreground: #0f172a;
+    --border: #1f3329;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Clean, professional agricultural card (No glassmorphism, subtle shadow & border) */
+.farm-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  border-radius: 0.875rem; /* 14px moderate rounded corners */
+}
+
+/* Subtle focus and button active states */
+button, input, select {
+  touch-action: manipulation;
+}
+
+/* Leaflet map styles harmonization */
+.leaflet-container {
+  font-family: inherit !important;
+  border-radius: 0.75rem;
+  z-index: 10;
+}
+
+.custom-location-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-pulse-ring {
+  width: 24px;
+  height: 24px;
+  background: rgba(37, 99, 235, 0.25);
+  border: 2px solid #2563eb;
+  border-radius: 50%;
+  position: relative;
+}
+
+.custom-pulse-dot {
+  width: 10px;
+  height: 10px;
+  background: #2563eb;
+  border-radius: 50%;
+  position: absolute;
+  top: 5px;
+  left: 5px;
+}
+
+.field-center-pin {
+  background: #15803d;
+  color: white;
+  border-radius: 9999px;
+  padding: 4px;
+  border: 2px solid white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

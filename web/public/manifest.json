@@ -1,0 +1,17 @@
+{
+  "name": "SmartFarm Voice",
+  "short_name": "SmartFarm",
+  "description": "Smart Agriculture Monitoring & Telugu Voice Irrigation Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06110d",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
