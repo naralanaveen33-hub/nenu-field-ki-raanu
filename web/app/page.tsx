@@ -399,7 +399,11 @@ export default function SmartFarmDashboard() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         {!isDemoMode && telemetry.source === 'raspberry_pi' && (
           <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">
-            Connected to Raspberry Pi backend{telemetry.is_demo_mode ? ' • Pi sensor simulation is active; Arduino is not connected' : ''}.
+            Connected to Raspberry Pi backend{telemetry.is_demo_mode
+              ? telemetry.serial_connected
+                ? ' • This selected farm has no live Arduino sensor data'
+                : ' • Arduino serial data is unavailable'
+              : ' • Live Arduino sensor data is active'}.
           </div>
         )}
         {/* Offline notice if gateway is disconnected */}
@@ -426,7 +430,7 @@ export default function SmartFarmDashboard() {
           isMotorRunning={telemetry.active_pump.is_running}
           isMotorPending={isCommandPending || telemetry.active_pump.is_pending}
           remainingSeconds={telemetry.active_pump.remaining_seconds}
-          sensorLabel={telemetry.is_demo_mode ? 'Pi simulation' : 'Arduino sensor'}
+          sensorLabel={telemetry.is_demo_mode ? 'No live Arduino data' : 'Arduino sensor'}
           language={language}
           onQuickStartPump={isDemoMode ? handleStartPump : undefined}
           onQuickStopPump={isDemoMode ? handleStopPump : undefined}

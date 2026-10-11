@@ -209,7 +209,7 @@ def get_status():
     - If farm_id is omitted: returns farm_selected=False and instructions to select a farm.
     """
     farm_id = request.args.get("farm_id") or request.args.get("field_id")
-    serial_ok = serial_manager.is_connected
+    serial_ok = serial_manager.has_recent_data
     is_demo = os.getenv("DEMO_MODE", "true").lower() in ("true", "1", "yes")
 
     if not farm_id or not str(farm_id).strip():
@@ -252,6 +252,10 @@ def get_status():
             "serial_connected": serial_ok,
             "timestamp": datetime.now().isoformat()
         }), 404
+
+    # The USB port being open does not establish that this farm has live data.
+    is_demo = not (serial_ok and sensor.get("is_hardware") and
+                   sensor.get("source") == "arduino" and not sensor.get("is_demo"))
 
     farm = get_field_by_id(clean_id)
     weather = weather_service.get_weather()

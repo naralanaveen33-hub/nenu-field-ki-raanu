@@ -28,6 +28,7 @@ class SerialManager:
 
         self.serial_conn = None
         self.is_connected = False
+        self.last_valid_packet_at = None
         self.running = False
         self.worker_thread = None
         self.lock = threading.Lock()
@@ -49,6 +50,13 @@ class SerialManager:
                 pass
             self.serial_conn = None
         self.is_connected = False
+        self.last_valid_packet_at = None
+
+    @property
+    def has_recent_data(self):
+        """Report live Arduino data only after a valid packet was parsed."""
+        return (self.is_connected and self.last_valid_packet_at is not None
+                and time.monotonic() - self.last_valid_packet_at < 30)
 
     def send_motor_command(self, action: str):
         """
@@ -71,7 +79,11 @@ class SerialManager:
                 except Exception as e:
                     logger.warning(f"Failed to send to serial: {e}. Falling back to demo ACK.")
 
-            # If Arduino is disconnected or demo mode is on, simulate motor confirmation
+            if not self.force_demo:
+                logger.error("Arduino command %s was not sent: serial data is unavailable", action)
+                return False
+
+            # Explicit demo mode only: simulate motor confirmation.
             target_state = 1 if action == "MOTOR_ON" else 0
             motor_controller.set_confirmed_state(target_state)
             sensor_manager.update_demo_step(target_state == 1)
@@ -90,6 +102,8 @@ class SerialManager:
             logger.info(f"Successfully connected to Arduino on {self.port} at {self.baud_rate} baud.")
             return True
         except Exception as e:
+            logger.warning("Could not open Arduino serial port %s at %s baud: %s",
+                           self.port, self.baud_rate, e)
             self.serial_conn = None
             self.is_connected = False
             return False
@@ -116,6 +130,9 @@ class SerialManager:
                 sensor_manager.update_from_serial(moisture, temp, hum, motor)
                 # Confirm motor state from hardware
                 motor_controller.set_confirmed_state(motor)
+                self.last_valid_packet_at = time.monotonic()
+                logger.info("Arduino packet: moisture=%s temp=%s humidity=%s motor=%s",
+                            moisture, temp, hum, motor)
                 return True
         except Exception as e:
             logger.debug(f"Could not parse serial line '{line}': {e}")
@@ -131,11 +148,13 @@ class SerialManager:
                 try:
                     line = self.serial_conn.readline().decode("utf-8", errors="ignore").strip()
                     if line:
-                        self._parse_arduino_line(line)
+                        if not self._parse_arduino_line(line):
+                            logger.warning("Unrecognized Arduino serial line: %r", line[:160])
                     time.sleep(0.1)
                 except Exception as e:
                     logger.warning(f"Serial read error: {e}. Reverting to demo mode.")
                     self.is_connected = False
+                    self.last_valid_packet_at = None
                     if self.serial_conn:
                         try:
                             self.serial_conn.close()
@@ -143,9 +162,9 @@ class SerialManager:
                             pass
                         self.serial_conn = None
             else:
-                # Disconnected or Demo Mode: generate smooth dynamic demo values
-                motor_status = motor_controller.get_status()["is_on"]
-                sensor_manager.update_demo_step(motor_status)
+                if self.force_demo:
+                    motor_status = motor_controller.get_status()["is_on"]
+                    sensor_manager.update_demo_step(motor_status)
                 time.sleep(2.0)
 
 # Singleton serial manager
