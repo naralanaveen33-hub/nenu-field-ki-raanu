@@ -101,9 +101,11 @@ export const FieldManagement: React.FC<FieldManagementProps> = ({
                 </div>
 
                 {/* Delete button (if more than 1 field) */}
-                {(!readOnly || canDelete) && fields.length > 1 && (
+                {canDelete && fields.length > 1 && (
                   <button
                     type="button"
+                    aria-label={language === 'te' ? `${field.name} పొలాన్ని తొలగించండి` : `Delete ${field.name}`}
+                    title={language === 'te' ? 'పొలాన్ని తొలగించండి' : 'Delete field'}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (confirm(language === 'te' ? 'ఈ పొలాన్ని తొలగించాలా?' : 'Delete this field?')) {
