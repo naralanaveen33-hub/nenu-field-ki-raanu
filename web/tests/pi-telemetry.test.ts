@@ -56,3 +56,18 @@ test('Pi JSON Arduino data preserves raw ADC without inventing a moisture percen
   assert.equal(telemetry.serial_connected, true);
   assert.equal(telemetry.is_demo_mode, false);
 });
+
+test('Pi calibrated Arduino percentage is passed through with the raw ADC', () => {
+  const telemetry = mapPiStatus({
+    ...piStatus,
+    demo_mode: false,
+    serial_connected: true,
+    sensor: {
+      farm_id: 'field-101', sensor_id: 'sensor_1', moisture: 0, soil_raw: 1003,
+      temperature: 33.5, humidity: 66.9, motor: 0, source: 'arduino_json', is_demo: false,
+      last_updated: new Date().toISOString(),
+    },
+  }, field);
+  assert.equal(telemetry.latest_sensor.soil_moisture, 0);
+  assert.equal(telemetry.latest_sensor.soil_raw, 1003);
+});

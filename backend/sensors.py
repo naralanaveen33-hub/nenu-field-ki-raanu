@@ -23,6 +23,7 @@ import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
+from backend.soil_calibration import moisture_percent
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SENSORS_FILE = PROJECT_ROOT / "data" / "sensors.json"
@@ -39,10 +40,20 @@ class SensorManager:
     def __init__(self, demo_mode: bool = True):
         self.lock = threading.Lock()
         self.demo_mode = demo_mode
+        self._soil_dry_adc = self._read_adc_calibration("SOIL_DRY_ADC")
+        self._soil_wet_adc = self._read_adc_calibration("SOIL_WET_ADC")
         self._hardware_farm_id = "field-101"
         self._demo_step = 0
         self._sensors: Dict[str, dict] = {}  # farm_id -> sensor data dict
         self._init_sensors_store()
+
+    @staticmethod
+    def _read_adc_calibration(name: str) -> Optional[int]:
+        try:
+            value = os.getenv(name, "").strip()
+            return int(value) if value else None
+        except ValueError:
+            return None
 
     def _init_sensors_store(self):
         """Load or create initial 1-to-1 farm-sensor records."""
@@ -200,12 +211,12 @@ class SensorManager:
                 self._save_to_disk_locked()
 
     def update_from_arduino_json(self, soil_raw: int, temp: float, hum: float, motor: int):
-        """Store exact Arduino JSON values without inventing soil calibration."""
+        """Store Arduino JSON values and calibrated relative soil moisture."""
         with self.lock:
             target_fid = self._hardware_farm_id
             if target_fid in self._sensors:
                 self._sensors[target_fid].update({
-                    "moisture": None,
+                    "moisture": moisture_percent(soil_raw, self._soil_dry_adc, self._soil_wet_adc),
                     "soil_raw": int(soil_raw),
                     "temperature": float(temp),
                     "humidity": float(hum),
