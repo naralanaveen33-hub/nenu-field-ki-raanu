@@ -79,6 +79,7 @@ export default function SmartFarmDashboard() {
   const [backendReady, setBackendReady] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [usingVerifiedFieldFallback, setUsingVerifiedFieldFallback] = useState(false);
+  const [fieldRetry, setFieldRetry] = useState(0);
 
   // Live status states
   const [isCommandPending, setIsCommandPending] = useState<boolean>(false);
@@ -127,7 +128,13 @@ export default function SmartFarmDashboard() {
       })
       .catch((error) => { if (!cancelled) setBackendError(error.message); });
     return () => { cancelled = true; };
-  }, []);
+  }, [fieldRetry]);
+
+  useEffect(() => {
+    if (!backendError || activeField) return;
+    const timer = setTimeout(() => setFieldRetry((count) => count + 1), 15000);
+    return () => clearTimeout(timer);
+  }, [backendError, activeField, fieldRetry]);
 
   // 1. Fetch live telemetry from server API
   const fetchLiveStatus = useCallback(async () => {
@@ -463,12 +470,43 @@ export default function SmartFarmDashboard() {
   };
 
   if (!backendReady && !isDemoMode) {
+    const offlineField = savedFarmDefinitions.find((field) => field.id === VERIFIED_HARDWARE_FIELD_ID);
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#f8f9f6] p-6">
-        <div className="max-w-lg rounded-xl border border-stone-200 bg-white p-6 text-stone-800">
-          <h1 className="text-xl font-bold">Smart Farm</h1>
-          <p className="mt-3">{backendError || 'Connecting to Raspberry Pi backend...'}</p>
-          {backendError && <button className="mt-4 rounded bg-emerald-700 px-4 py-2 text-white" onClick={() => window.location.reload()}>Retry connection</button>}
+      <main className="min-h-screen bg-[#f8f9f6] p-6 text-stone-900">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">
+            <h1 className="text-2xl font-bold">Smart Farm</h1>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900">
+              {backendError ? 'Pi connection unavailable' : 'Connecting to Pi'}
+            </span>
+          </header>
+          <section className="rounded-xl border border-amber-300 bg-amber-50 p-5">
+            <h2 className="text-lg font-bold">{offlineField?.name || 'Saved field'}</h2>
+            <p className="mt-2 text-sm text-amber-950">
+              {backendError
+                ? 'Live Arduino readings and motor status are unavailable. The dashboard will retry automatically.'
+                : 'Waiting for live Arduino readings from the Raspberry Pi.'}
+            </p>
+            {backendError && (
+              <button className="mt-4 rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white" onClick={() => setFieldRetry((count) => count + 1)}>
+                Retry now
+              </button>
+            )}
+          </section>
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Field status">
+            {[
+              ['Soil moisture', '--'],
+              ['Temperature', '--'],
+              ['Humidity', '--'],
+              ['Motor status', 'UNKNOWN'],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-stone-200 bg-white p-5">
+                <p className="text-sm text-stone-600">{label}</p>
+                <p className="mt-2 text-3xl font-bold">{value}</p>
+              </div>
+            ))}
+          </section>
+          <p className="text-sm text-stone-600">Motor controls will return after the Pi confirms fresh Arduino data.</p>
         </div>
       </main>
     );
