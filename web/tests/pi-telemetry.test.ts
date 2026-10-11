@@ -32,3 +32,27 @@ test('Pi status uses the selected farm and its sensor reading', () => {
 test('Pi status rejects a response from another farm', () => {
   assert.throws(() => mapPiStatus({ ...piStatus, farm_id: 'field-102' }, field));
 });
+
+test('Pi JSON Arduino data preserves raw ADC without inventing a moisture percent', () => {
+  const telemetry = mapPiStatus({
+    ...piStatus,
+    demo_mode: false,
+    serial_connected: true,
+    serial_port_open: true,
+    sensor: {
+      farm_id: 'field-101', sensor_id: 'sensor_1', moisture: null, soil_raw: 1008,
+      temperature: 0, humidity: 0, motor: 0, source: 'arduino_json', is_demo: false,
+      last_updated: new Date().toISOString(),
+    },
+    recommendation: {
+      recommendation: 'SENSOR CALIBRATION REQUIRED',
+      reason: 'Raw ADC has no percent calibration.', reason_te: '',
+    },
+  }, field);
+  assert.equal(telemetry.latest_sensor.soil_moisture, null);
+  assert.equal(telemetry.latest_sensor.soil_raw, 1008);
+  assert.equal(telemetry.latest_sensor.temperature, 0);
+  assert.equal(telemetry.latest_sensor.humidity, 0);
+  assert.equal(telemetry.serial_connected, true);
+  assert.equal(telemetry.is_demo_mode, false);
+});

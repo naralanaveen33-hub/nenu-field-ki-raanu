@@ -33,8 +33,8 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
   sensorLabel = 'DHT22',
 }) => {
   // Use calibrated percentage from backend
-  const moistureValue = typeof sensor.soil_moisture === 'number' ? sensor.soil_moisture : 0;
-  const moistureStatus = getMoistureStatus(moistureValue, targetMin, targetMax);
+  const moistureValue = typeof sensor.soil_moisture === 'number' ? sensor.soil_moisture : null;
+  const moistureStatus = moistureValue === null ? null : getMoistureStatus(moistureValue, targetMin, targetMax);
 
   return (
     <section aria-label="Top Agricultural Metrics">
@@ -49,15 +49,15 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
 
             <div className="flex items-baseline gap-1 mt-1">
               <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-stone-900 dark:text-stone-100 font-mono">
-                {moistureValue.toFixed(1)}
+                {moistureValue === null ? '--' : moistureValue.toFixed(1)}
               </span>
-              <span className="text-lg font-semibold text-stone-500">%</span>
+              {moistureValue !== null && <span className="text-lg font-semibold text-stone-500">%</span>}
             </div>
 
             {/* If backend provides raw sensor values, display alongside calibrated percentage */}
             {sensor.soil_raw !== undefined && (
               <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-0.5 font-mono">
-                Raw: {sensor.soil_raw} ADC
+                {language === 'te' ? 'ముడి విలువ:' : 'Raw:'} {sensor.soil_raw} ADC
               </p>
             )}
           </div>
@@ -67,10 +67,12 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
               {language === 'te' ? 'స్థితి:' : 'Status:'}
             </span>
             <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${moistureStatus.badgeBg}`}
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${moistureStatus?.badgeBg || 'bg-amber-100 text-amber-800 border-amber-300'}`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-current" />
-              {language === 'te' ? moistureStatus.label_te : moistureStatus.label_en}
+              {moistureStatus
+                ? language === 'te' ? moistureStatus.label_te : moistureStatus.label_en
+                : language === 'te' ? 'కాలిబ్రేషన్ అవసరం' : 'Calibration required'}
             </span>
           </div>
         </div>

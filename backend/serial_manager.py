@@ -12,6 +12,8 @@ MOTOR_OFF
 
 import os
 import time
+import json
+import math
 import logging
 import threading
 from datetime import datetime
@@ -23,7 +25,7 @@ logger = logging.getLogger("SerialManager")
 class SerialManager:
     def __init__(self):
         self.port = os.getenv("SERIAL_PORT", "/dev/ttyACM0")
-        self.baud_rate = int(os.getenv("SERIAL_BAUD") or os.getenv("BAUD_RATE", "9600"))
+        self.baud_rate = int(os.getenv("SERIAL_BAUD") or os.getenv("BAUD_RATE", "115200"))
         self.force_demo = os.getenv("DEMO_MODE", "true").lower() in ("true", "1", "yes")
 
         self.serial_conn = None
@@ -110,9 +112,38 @@ class SerialManager:
 
     def _parse_arduino_line(self, line: str):
         """
-        Parse line: MOISTURE:42,TEMP:30.5,HUM:68,MOTOR:0
+        Parse the existing Arduino JSON line protocol:
+        {"soil":1008,"temperature":0.0,"humidity":0.0,"pump":0}
+        Legacy labeled CSV packets remain supported.
         """
         try:
+            if line == "SMARTFARM_READY":
+                logger.info("Arduino startup banner received")
+                return False
+
+            if line.startswith("{"):
+                packet = json.loads(line)
+                required = ("soil", "temperature", "humidity", "pump")
+                if not all(key in packet for key in required):
+                    raise ValueError("Arduino JSON packet is missing required fields")
+                values = {key: float(packet[key]) for key in required}
+                if not all(math.isfinite(value) for value in values.values()):
+                    raise ValueError("Arduino JSON packet contains a non-finite value")
+                if values["soil"] < 0 or values["soil"] > 1023:
+                    raise ValueError("Arduino soil ADC value is outside 0..1023")
+
+                sensor_manager.update_from_arduino_json(
+                    soil_raw=int(values["soil"]),
+                    temp=values["temperature"],
+                    hum=values["humidity"],
+                    motor=int(values["pump"]),
+                )
+                motor_controller.set_confirmed_state(int(values["pump"]))
+                self.last_valid_packet_at = time.monotonic()
+                logger.info("Arduino JSON packet parsed: soil_adc=%s temperature=%s humidity=%s pump=%s",
+                            int(values["soil"]), values["temperature"], values["humidity"], int(values["pump"]))
+                return True
+
             parts = line.strip().split(",")
             data = {}
             for part in parts:

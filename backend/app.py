@@ -152,6 +152,7 @@ def get_sensors():
         "farm_id": clean_id,
         "sensor_id": sensor.get("sensor_id"),
         "moisture": sensor.get("moisture"),
+        "soil_raw": sensor.get("soil_raw"),
         "temperature": sensor.get("temperature"),
         "humidity": sensor.get("humidity"),
         "motor": sensor.get("motor", 0),
@@ -195,6 +196,13 @@ def get_recommendation():
             "reason": f"Farm {farm_id} not found.",
             "reason_te": "ఎంచుకున్న ఫార్మ్ కనుగొనబడలేదు."
         }), 404
+
+    if sensor.get("moisture") is None:
+        return jsonify({
+            "recommendation": "SENSOR CALIBRATION REQUIRED",
+            "reason": "Arduino soil ADC data is available, but no calibration is configured to convert it to moisture percent.",
+            "reason_te": "ఆర్డునో మట్టి ADC డేటా అందుబాటులో ఉంది. శాతం తేమగా మార్చడానికి కాలిబ్రేషన్ లేదు."
+        })
 
     weather = weather_service.get_weather()
     rec = evaluate_irrigation(sensor["moisture"], weather.get("rain_probability", 0))
@@ -259,11 +267,20 @@ def get_status():
 
     # The USB port being open does not establish that this farm has live data.
     is_demo = not (serial_ok and sensor.get("is_hardware") and
-                   sensor.get("source") == "arduino" and not sensor.get("is_demo"))
+                   sensor.get("source", "").startswith("arduino") and not sensor.get("is_demo"))
 
     farm = get_field_by_id(clean_id)
     weather = weather_service.get_weather()
-    rec = evaluate_irrigation(sensor["moisture"], weather.get("rain_probability", 0))
+    if sensor.get("moisture") is None:
+        rec = {
+            "recommendation": "SENSOR CALIBRATION REQUIRED",
+            "reason": "Arduino soil ADC value is reported raw; soil moisture percent and irrigation advice need sensor calibration.",
+            "reason_te": "ఆర్డునో మట్టి ADC విలువ ముడి రీడింగ్. తేమ శాతం, నీటి సలహాకు సెన్సార్ కాలిబ్రేషన్ అవసరం.",
+            "soil_raw": sensor.get("soil_raw"),
+            "rain_probability": weather.get("rain_probability", 0),
+        }
+    else:
+        rec = evaluate_irrigation(sensor["moisture"], weather.get("rain_probability", 0))
 
     motor_status = {
         "is_on": sensor.get("motor", 0) == 1,

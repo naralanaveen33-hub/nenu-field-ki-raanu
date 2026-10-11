@@ -190,6 +190,24 @@ class SensorManager:
                 })
                 self._save_to_disk_locked()
 
+    def update_from_arduino_json(self, soil_raw: int, temp: float, hum: float, motor: int):
+        """Store exact Arduino JSON values without inventing soil calibration."""
+        with self.lock:
+            target_fid = self._hardware_farm_id
+            if target_fid in self._sensors:
+                self._sensors[target_fid].update({
+                    "moisture": None,
+                    "soil_raw": int(soil_raw),
+                    "temperature": float(temp),
+                    "humidity": float(hum),
+                    "motor": int(motor),
+                    "is_hardware": True,
+                    "is_demo": False,
+                    "last_updated": datetime.now().isoformat(),
+                    "source": "arduino_json",
+                })
+                self._save_to_disk_locked()
+
     def update_demo_step(self, motor_active: bool):
         """
         Advance demo physics for the hardware sensor:

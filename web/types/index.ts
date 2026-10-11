@@ -60,7 +60,7 @@ export interface SensorReading {
   device_id: string;
   temperature: number;
   humidity: number;
-  soil_moisture: number;
+  soil_moisture: number | null;
   battery_level?: number;
   soil_raw?: number;
   recorded_at: string;
@@ -105,7 +105,7 @@ export interface WeatherData {
 export interface IrrigationRecommendation {
   id: string;
   farm_id: string;
-  soil_moisture: number;
+  soil_moisture: number | null;
   rain_probability: number;
   precipitation_mm: number;
   recommendation: RecommendationType;

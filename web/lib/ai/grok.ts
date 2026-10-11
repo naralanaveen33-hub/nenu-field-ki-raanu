@@ -18,7 +18,7 @@
  */
 
 export interface FarmChatContext {
-  soilMoisture?: number | string;
+  soilMoisture?: number | string | null;
   temperature?: number | string;
   humidity?: number | string;
   weather?: string;
@@ -113,7 +113,7 @@ export function formatFarmContext(ctx?: FarmChatContext): string {
   }
 
   const moisture = ctx.soilMoisture;
-  if (moisture !== undefined) {
+  if (moisture !== undefined && moisture !== null) {
     const val = typeof moisture === 'number' ? `${moisture}%` : `${moisture}`.includes('%') ? moisture : `${moisture}%`;
     lines.push(`Soil moisture: ${val}`);
   }

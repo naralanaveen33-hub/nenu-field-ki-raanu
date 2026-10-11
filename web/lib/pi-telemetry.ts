@@ -32,8 +32,12 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
   const sensor = data?.sensor || data?.sensors;
   const weather = data?.weather;
   const advice = data?.recommendation;
+  const moisture = sensor?.moisture == null ? null : Number(sensor.moisture);
+  const soilRaw = sensor?.soil_raw == null ? null : Number(sensor.soil_raw);
   if (data?.farm_selected !== true || data.farm_id !== field.id || sensor?.farm_id !== field.id ||
-      !weather || !advice || !Number.isFinite(Number(sensor.moisture))) {
+      !weather || !advice ||
+      (moisture !== null && !Number.isFinite(moisture)) ||
+      (moisture === null && (soilRaw === null || !Number.isFinite(soilRaw)))) {
     throw new Error(`Pi has no status for ${field.name}`);
   }
 
@@ -72,7 +76,8 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
       device_id: data.sensor_id || sensor.sensor_id,
       temperature: Number(sensor.temperature),
       humidity: Number(sensor.humidity),
-      soil_moisture: Number(sensor.moisture),
+      soil_moisture: moisture,
+      ...(soilRaw === null ? {} : { soil_raw: soilRaw }),
       recorded_at: readingAt,
       is_stale: !demo && ageSeconds > 120,
     },
@@ -101,7 +106,7 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
     recommendation: {
       id: `pi-${field.id}`,
       farm_id: field.id,
-      soil_moisture: Number(sensor.moisture),
+      soil_moisture: moisture,
       rain_probability: Number(weather.rain_probability),
       precipitation_mm: 0,
       recommendation,
