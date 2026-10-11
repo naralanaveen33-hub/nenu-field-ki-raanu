@@ -303,13 +303,13 @@ def get_status():
         "serial_connected": serial_ok,
         "serial_port_open": serial_manager.is_connected,
         "arduino_data_received": serial_ok,
+        "arduino_packet_sequence": serial_manager.packet_sequence,
         "demo_mode": is_demo,
         "timestamp": datetime.now().isoformat()
     })
 
-@app.route("/api/motor/on", methods=["POST"])
-def motor_on():
-    """Explicit farmer action to start the motor for the selected farm."""
+def _send_motor_action(target_on: bool):
+    """Send a confirmed motor request and report hardware state without guessing."""
     body = request.get_json(silent=True) or {}
     farm_id = body.get("farm_id") or request.args.get("farm_id")
     if not farm_id:
@@ -324,65 +324,75 @@ def motor_on():
     if not sensor:
         return jsonify({"success": False, "error": "farm_not_found"}), 404
 
+    if body.get("confirmed") is not True:
+        return jsonify({
+            "success": False,
+            "error": "explicit_confirmation_required",
+            "message": "Confirm the motor action before sending it."
+        }), 400
+
+    is_demo = serial_manager.force_demo
+    if not is_demo:
+        if not sensor.get("is_hardware"):
+            return jsonify({
+                "success": False,
+                "error": "farm_not_connected_to_arduino",
+                "message": "The selected farm is not connected to the Arduino motor controller."
+            }), 409
+        if not serial_manager.has_recent_data:
+            return jsonify({
+                "success": False,
+                "error": "arduino_not_live",
+                "message": "No recent valid Arduino packets are available; motor command was not sent."
+            }), 503
+
     operator = body.get("operator", "farmer_dashboard")
-    sensor_manager.set_motor_state(clean_id, True)
+    action = "MOTOR_ON" if target_on else "MOTOR_OFF"
+    if not serial_manager.send_motor_command(action):
+        return jsonify({
+            "success": False,
+            "error": "motor_command_failed",
+            "message": "The command could not be sent to the Arduino."
+        }), 503
 
-    # If this farm is linked to physical Arduino hardware, send serial command
-    if clean_id == "field-101" or sensor.get("is_hardware"):
+    if target_on:
         motor_controller.request_motor_on(operator)
-        serial_manager.send_motor_command("MOTOR_ON")
+    else:
+        motor_controller.request_motor_off(operator)
 
+    # In live mode, only the next parsed Arduino packet can confirm this request.
+    current_sensor = sensor_manager.get_sensor_for_farm(clean_id) or sensor
+    confirmed_on = current_sensor.get("motor", 0) == 1
+    packet_sequence = serial_manager.packet_sequence
+    pending = not is_demo
     status = {
-        "is_on": True,
-        "status": "ON",
+        "is_on": confirmed_on,
+        "status": "ON" if confirmed_on else "OFF",
+        "requested": "ON" if target_on else "OFF",
+        "pending": pending,
         "farm_id": clean_id
     }
 
     return jsonify({
         "success": True,
-        "action": "MOTOR_ON",
+        "action": action,
         "farm_id": clean_id,
         "motor": status,
-        "message": f"Motor activation requested for {clean_id}."
-    })
+        "packet_sequence": packet_sequence,
+        "message": ("Motor command sent; waiting for a fresh Arduino status packet." if pending
+                    else f"Motor status confirmed by the demo controller for {clean_id}.")
+    }), (202 if pending else 200)
+
+
+@app.route("/api/motor/on", methods=["POST"])
+def motor_on():
+    """Explicit, confirmed farmer action to start the motor."""
+    return _send_motor_action(True)
 
 @app.route("/api/motor/off", methods=["POST"])
 def motor_off():
-    """Explicit farmer action to shut down the motor for the selected farm."""
-    body = request.get_json(silent=True) or {}
-    farm_id = body.get("farm_id") or request.args.get("farm_id")
-    if not farm_id:
-        return jsonify({
-            "success": False,
-            "error": "no_farm_selected",
-            "message": "Please select a farm to control its motor."
-        }), 400
-
-    clean_id = str(farm_id).strip()
-    sensor = sensor_manager.get_sensor_for_farm(clean_id)
-    if not sensor:
-        return jsonify({"success": False, "error": "farm_not_found"}), 404
-
-    operator = body.get("operator", "farmer_dashboard")
-    sensor_manager.set_motor_state(clean_id, False)
-
-    if clean_id == "field-101" or sensor.get("is_hardware"):
-        motor_controller.request_motor_off(operator)
-        serial_manager.send_motor_command("MOTOR_OFF")
-
-    status = {
-        "is_on": False,
-        "status": "OFF",
-        "farm_id": clean_id
-    }
-
-    return jsonify({
-        "success": True,
-        "action": "MOTOR_OFF",
-        "farm_id": clean_id,
-        "motor": status,
-        "message": f"Motor shutdown command sent for {clean_id}."
-    })
+    """Explicit, confirmed farmer action to shut down the motor."""
+    return _send_motor_action(False)
 
 @app.route("/api/motor", methods=["GET", "POST"])
 def motor_base():

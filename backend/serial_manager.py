@@ -31,6 +31,7 @@ class SerialManager:
         self.serial_conn = None
         self.is_connected = False
         self.last_valid_packet_at = None
+        self.packet_sequence = 0
         self.running = False
         self.worker_thread = None
         self.lock = threading.Lock()
@@ -140,6 +141,7 @@ class SerialManager:
                 )
                 motor_controller.set_confirmed_state(int(values["pump"]))
                 self.last_valid_packet_at = time.monotonic()
+                self.packet_sequence += 1
                 logger.info("Arduino JSON packet parsed: soil_adc=%s temperature=%s humidity=%s pump=%s",
                             int(values["soil"]), values["temperature"], values["humidity"], int(values["pump"]))
                 return True
@@ -162,6 +164,7 @@ class SerialManager:
                 # Confirm motor state from hardware
                 motor_controller.set_confirmed_state(motor)
                 self.last_valid_packet_at = time.monotonic()
+                self.packet_sequence += 1
                 logger.info("Arduino packet: moisture=%s temp=%s humidity=%s motor=%s",
                             moisture, temp, hum, motor)
                 return True

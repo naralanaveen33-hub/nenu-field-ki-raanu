@@ -6,6 +6,7 @@ import { TelemetryGrid } from '@/components/dashboard/TelemetryGrid';
 import { WeatherCard } from '@/components/dashboard/WeatherCard';
 import { RecommendationBanner } from '@/components/dashboard/RecommendationBanner';
 import { PumpControlCard } from '@/components/dashboard/PumpControlCard';
+import { LiveMotorControlCard } from '@/components/dashboard/LiveMotorControlCard';
 import { FarmMap } from '@/components/map/FarmMap';
 import { FieldManagement } from '@/components/dashboard/FieldManagement';
 import { PushToTalkButton } from '@/components/voice/PushToTalkButton';
@@ -295,6 +296,53 @@ export default function SmartFarmDashboard() {
     }));
   };
 
+  const handleSetLiveMotor = async (target: 'on' | 'off'): Promise<string> => {
+    if (!activeField || !farmId) throw new Error(language === 'te' ? 'ముందుగా పొలాన్ని ఎంచుకోండి.' : 'Select a field first.');
+    const backendUrl = getBackendApiUrl();
+    if (!backendUrl) throw new Error(language === 'te' ? 'Pi API URL అందుబాటులో లేదు.' : 'Pi API URL is not configured.');
+    if (!telemetry.serial_connected || telemetry.is_demo_mode) {
+      throw new Error(language === 'te' ? 'తాజా ఆర్డునో డేటా లేదు. మోటార్ ఆదేశం పంపలేదు.' : 'Fresh Arduino data is unavailable. No motor command was sent.');
+    }
+
+    const endpoint = `${backendUrl}/api/motor/${target}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ farm_id: farmId, operator: 'farmer_dashboard', confirmed: true }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success !== true) {
+      throw new Error(result.message || result.error || `Pi rejected the motor command (HTTP ${response.status}).`);
+    }
+
+    const packetSequence = Number(result.packet_sequence);
+    const expectedState = target === 'on';
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const statusResponse = await fetch(`${backendUrl}/api/status?farm_id=${encodeURIComponent(farmId)}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!statusResponse.ok) continue;
+      const status = await statusResponse.json();
+      if (Number(status.arduino_packet_sequence) <= packetSequence) continue;
+
+      const updatedTelemetry = mapPiStatus(status, activeField);
+      setTelemetry(updatedTelemetry);
+      if (status.motor?.is_on === expectedState) {
+        return language === 'te'
+          ? (expectedState ? 'ఆర్డునో మోటార్ ఆన్ అని నిర్ధారించింది.' : 'ఆర్డునో మోటార్ ఆఫ్ అని నిర్ధారించింది.')
+          : (expectedState ? 'Arduino confirmed the motor is ON.' : 'Arduino confirmed the motor is OFF.');
+      }
+    }
+
+    await fetchLiveStatus();
+    throw new Error(language === 'te'
+      ? 'ఆదేశం పంపబడింది, కానీ ఆర్డునో కొత్త స్థితిని నిర్ధారించలేదు. మోటార్ స్థితిని ప్రత్యక్షంగా పరిశీలించండి.'
+      : 'Command was sent, but no fresh Arduino packet confirmed the requested state. Check the motor status directly.');
+  };
+
   // Handlers for Farm Assistant Chatbot (using live backend context, strictly via /api/chat)
   const handleProcessVoiceCommand = async (transcript: string) => {
     const backendUrl = getBackendApiUrl();
@@ -538,10 +586,12 @@ export default function SmartFarmDashboard() {
             language={language}
             onStartPump={handleStartPump}
             onStopPump={handleStopPump}
-          /> : <div className="farm-card p-5 text-sm text-stone-700">
-            <h3 className="font-bold">Motor status: {telemetry.active_pump.is_running ? 'ON' : 'OFF'}</h3>
-            <p className="mt-2">Live motor controls are disabled until Arduino command acknowledgement is verified.</p>
-          </div>}
+          /> : <LiveMotorControlCard
+            isRunning={telemetry.active_pump.is_running}
+            isConnected={Boolean(telemetry.serial_connected && !telemetry.is_demo_mode)}
+            language={language}
+            onSetMotor={handleSetLiveMotor}
+          />}
 
           {isDemoMode ? <HistoricalCharts farmId={farmId} language={language} /> : (
             <div className="farm-card p-5 text-sm text-stone-600">Historical charts are unavailable until the Pi backend records and exposes history.</div>
