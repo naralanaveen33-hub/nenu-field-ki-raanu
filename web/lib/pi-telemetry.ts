@@ -116,5 +116,6 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
     is_demo_mode: demo,
     source: 'raspberry_pi',
     serial_connected: data.serial_connected === true,
+    serial_port_open: data.serial_port_open === true,
   };
 }

@@ -402,7 +402,9 @@ export default function SmartFarmDashboard() {
             Connected to Raspberry Pi backend{telemetry.is_demo_mode
               ? telemetry.serial_connected
                 ? ' • This selected farm has no live Arduino sensor data'
-                : ' • Arduino serial data is unavailable'
+                : telemetry.serial_port_open
+                  ? ' • Serial port is open, but no valid Arduino sensor packets have arrived'
+                  : ' • Arduino serial port could not be opened'
               : ' • Live Arduino sensor data is active'}.
           </div>
         )}

@@ -230,6 +230,8 @@ def get_status():
             },
             "weather": None,
             "serial_connected": serial_ok,
+            "serial_port_open": serial_manager.is_connected,
+            "arduino_data_received": serial_ok,
             "demo_mode": is_demo,
             "timestamp": datetime.now().isoformat()
         })
@@ -250,6 +252,8 @@ def get_status():
             },
             "weather": None,
             "serial_connected": serial_ok,
+            "serial_port_open": serial_manager.is_connected,
+            "arduino_data_received": serial_ok,
             "timestamp": datetime.now().isoformat()
         }), 404
 
@@ -280,6 +284,8 @@ def get_status():
         "weather": weather,
         "recommendation": rec,
         "serial_connected": serial_ok,
+        "serial_port_open": serial_manager.is_connected,
+        "arduino_data_received": serial_ok,
         "demo_mode": is_demo,
         "timestamp": datetime.now().isoformat()
     })

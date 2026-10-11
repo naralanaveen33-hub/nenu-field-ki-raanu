@@ -152,5 +152,6 @@ export interface TelemetrySummary {
   is_demo_mode: boolean;
   source?: 'raspberry_pi' | 'local_demo';
   serial_connected?: boolean;
+  serial_port_open?: boolean;
 }
 
