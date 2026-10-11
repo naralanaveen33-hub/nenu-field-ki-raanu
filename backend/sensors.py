@@ -273,6 +273,19 @@ class SensorManager:
                 self._sensors[farm_id]["last_updated"] = datetime.now().isoformat()
                 self._save_to_disk_locked()
 
+    def update_arduino_motor_status(self, is_on: int):
+        """Apply Arduino's command acknowledgment without refreshing sensor timestamps."""
+        with self.lock:
+            sensor = self._sensors.get(self._hardware_farm_id)
+            if sensor is None:
+                return
+            sensor.update({
+                "motor": 1 if int(is_on) else 0,
+                "is_hardware": True,
+                "is_demo": False,
+            })
+            self._save_to_disk_locked()
+
 
 # Singleton SensorManager instance
 sensor_manager = SensorManager(demo_mode=True)

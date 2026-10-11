@@ -6,8 +6,9 @@ Packet format received from Arduino:
 MOISTURE:42,TEMP:30.5,HUM:68,MOTOR:0
 
 Commands sent to Arduino:
-MOTOR_ON
-MOTOR_OFF
+PUMP_ON
+PUMP_OFF
+STATUS
 """
 
 import os
@@ -64,20 +65,26 @@ class SerialManager:
     def send_motor_command(self, action: str):
         """
         Send command to Arduino over Serial, or simulate acknowledgment if in demo mode.
-        action: 'MOTOR_ON' or 'MOTOR_OFF'
+        Internal motor actions are translated to the Arduino's PUMP_ON/PUMP_OFF protocol.
         """
         action = action.strip().upper()
-        if action not in ("MOTOR_ON", "MOTOR_OFF"):
+        wire_command = {
+            "MOTOR_ON": "PUMP_ON",
+            "MOTOR_OFF": "PUMP_OFF",
+            "PUMP_ON": "PUMP_ON",
+            "PUMP_OFF": "PUMP_OFF",
+        }.get(action)
+        if wire_command is None:
             logger.error(f"Invalid motor command: {action}")
             return False
 
         with self.lock:
             if self.is_connected and self.serial_conn:
                 try:
-                    payload = f"{action}\n".encode("utf-8")
+                    payload = f"{wire_command}\n".encode("utf-8")
                     self.serial_conn.write(payload)
                     self.serial_conn.flush()
-                    logger.info(f"Sent serial command to Arduino: {action}")
+                    logger.info("Sent serial command to Arduino: %s", wire_command)
                     return True
                 except Exception as e:
                     logger.warning(f"Failed to send to serial: {e}. Falling back to demo ACK.")
@@ -87,7 +94,7 @@ class SerialManager:
                 return False
 
             # Explicit demo mode only: simulate motor confirmation.
-            target_state = 1 if action == "MOTOR_ON" else 0
+            target_state = 1 if wire_command == "PUMP_ON" else 0
             motor_controller.set_confirmed_state(target_state)
             sensor_manager.update_demo_step(target_state == 1)
             return True
@@ -124,6 +131,18 @@ class SerialManager:
 
             if line.startswith("{"):
                 packet = json.loads(line)
+                command = packet.get("command")
+                if packet.get("ok") is True and command in ("PUMP_ON", "PUMP_OFF"):
+                    pump_value = float(packet.get("pump"))
+                    if pump_value not in (0.0, 1.0):
+                        raise ValueError("Arduino pump confirmation must be 0 or 1")
+                    pump_state = int(pump_value)
+                    sensor_manager.update_arduino_motor_status(pump_state)
+                    motor_controller.set_confirmed_state(pump_state)
+                    self.packet_sequence += 1
+                    logger.info("Arduino confirmed command=%s pump=%s", command, pump_state)
+                    return True
+
                 required = ("soil", "temperature", "humidity", "pump")
                 if not all(key in packet for key in required):
                     raise ValueError("Arduino JSON packet is missing required fields")
