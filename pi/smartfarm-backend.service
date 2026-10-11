@@ -1,0 +1,22 @@
+[Unit]
+Description=SmartFarm Raspberry Pi Flask Backend
+Documentation=https://github.com/naralanaveen33-hub/nenu-field-ki-raanu
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/nenu-field-ki-raanu
+EnvironmentFile=/home/pi/nenu-field-ki-raanu/.env
+ExecStart=/home/pi/nenu-field-ki-raanu/.venv/bin/python backend/app.py
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=smartfarm-backend
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

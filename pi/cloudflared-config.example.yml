@@ -1,0 +1,17 @@
+# ============================================================================
+# Cloudflare Tunnel Configuration Template (Raspberry Pi -> Vercel)
+# ============================================================================
+# Path on Raspberry Pi: ~/.cloudflared/config.yml or /etc/cloudflared/config.yml
+
+tunnel: <YOUR_TUNNEL_NAME_OR_UUID>
+credentials-file: /home/pi/.cloudflared/<YOUR_TUNNEL_UUID>.json
+
+ingress:
+  # Route traffic for your secure API domain to the local Flask backend
+  - hostname: api-smartfarm.yourdomain.com
+    service: http://127.0.0.1:5000
+    originRequest:
+      noTLSVerify: true
+
+  # Default rule returns 404 for any unmatched hostnames
+  - service: http_status:404
