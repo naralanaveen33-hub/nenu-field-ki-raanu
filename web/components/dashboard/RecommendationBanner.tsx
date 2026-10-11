@@ -10,6 +10,7 @@ interface RecommendationBannerProps {
   language: 'te' | 'en';
   onConfirmIrrigation: (durationSeconds: number) => Promise<void>;
   onRejectIrrigation: () => void;
+  controlsEnabled?: boolean;
 }
 
 export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
@@ -18,6 +19,7 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
   language,
   onConfirmIrrigation,
   onRejectIrrigation,
+  controlsEnabled = true,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -91,7 +93,7 @@ export const RecommendationBanner: React.FC<RecommendationBannerProps> = ({
           </div>
 
           {/* Right: Confirmation Actions if Recommended */}
-          {isRecommended && !isPumpRunning && (
+          {controlsEnabled && isRecommended && !isPumpRunning && (
             <div className="w-full md:w-auto p-3.5 rounded-lg bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-xs shrink-0">
               <span className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-2">
                 {language === 'te' ? 'మోటార్ ఆన్ చేయాలా?' : 'Start Irrigation?'}

@@ -86,6 +86,7 @@ export interface WeatherData {
   humidity: number;
   rain_probability: number;
   precipitation_mm: number;
+  precipitation_unknown?: boolean;
   wind_speed: number;
   weather_code?: number;
   forecast_summary?: string;
@@ -149,5 +150,7 @@ export interface TelemetrySummary {
   weather: WeatherData;
   recommendation: IrrigationRecommendation;
   is_demo_mode: boolean;
+  source?: 'raspberry_pi' | 'local_demo';
+  serial_connected?: boolean;
 }
 

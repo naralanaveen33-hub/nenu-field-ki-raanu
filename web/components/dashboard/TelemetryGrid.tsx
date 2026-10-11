@@ -16,6 +16,7 @@ interface TelemetryGridProps {
   language: 'te' | 'en';
   onQuickStartPump?: (durationSeconds: number) => Promise<void>;
   onQuickStopPump?: () => Promise<void>;
+  sensorLabel?: string;
 }
 
 export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
@@ -29,6 +30,7 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
   language,
   onQuickStartPump,
   onQuickStopPump,
+  sensorLabel = 'DHT22',
 }) => {
   // Use calibrated percentage from backend
   const moistureValue = typeof sensor.soil_moisture === 'number' ? sensor.soil_moisture : 0;
@@ -91,7 +93,7 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
 
           <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400">
             <span>{language === 'te' ? 'సెన్సార్ రీడింగ్' : 'Field Sensor'}</span>
-            <span className="font-medium text-stone-600 dark:text-stone-300">DHT22</span>
+            <span className="font-medium text-stone-600 dark:text-stone-300">{sensorLabel}</span>
           </div>
         </div>
 

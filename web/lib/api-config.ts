@@ -8,7 +8,7 @@
  * Vercel (Next.js Frontend)
  *   ↓ HTTPS (via NEXT_PUBLIC_API_URL)
  * Raspberry Pi Flask Backend (port 5000 / public tunnel)
- *   ↓ Serial (115200 baud)
+ *   ↓ Serial (9600 baud)
  * Arduino Uno
  *   ↓
  * Relay / Soil Moisture / DHT11

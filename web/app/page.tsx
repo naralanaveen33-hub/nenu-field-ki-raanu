@@ -20,6 +20,8 @@ import {
 } from '@/lib/demo/store';
 import { TelemetrySummary, FarmField } from '@/types';
 import { ActiveCallState } from '@/lib/calling/types';
+import { getBackendApiUrl } from '@/lib/api-config';
+import { mapPiField, mapPiStatus } from '@/lib/pi-telemetry';
 
 const STORAGE_KEY = 'smartfarm_saved_fields';
 const ACTIVE_FIELD_KEY = 'smartfarm_active_field_id';
@@ -70,8 +72,10 @@ export default function SmartFarmDashboard() {
   );
 
   // Field state
-  const [savedFields, setSavedFields] = useState<FarmField[]>(DEFAULT_FIELDS);
-  const [activeField, setActiveField] = useState<FarmField | null>(DEFAULT_FIELDS[0]);
+  const [savedFields, setSavedFields] = useState<FarmField[]>([]);
+  const [activeField, setActiveField] = useState<FarmField | null>(null);
+  const [backendReady, setBackendReady] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   // Live status states
   const [isCommandPending, setIsCommandPending] = useState<boolean>(false);
@@ -81,51 +85,50 @@ export default function SmartFarmDashboard() {
   const [activeVoIPCall, setActiveVoIPCall] = useState<ActiveCallState | null>(null);
   const [isVoIPModalOpen, setIsVoIPModalOpen] = useState(false);
 
-  const farmId = telemetry.farm?.id || '11111111-1111-1111-1111-111111111111';
+  const farmId = activeField?.id || '';
   const deviceId = telemetry.device?.id || '22222222-2222-2222-2222-222222222222';
 
-  // Load saved fields from localStorage on client mount
+  // The Pi owns farm IDs. Local browser defaults must not drive live requests.
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSavedFields(parsed);
-          const savedId = localStorage.getItem(ACTIVE_FIELD_KEY);
-          const match = parsed.find((f: FarmField) => f.id === savedId);
-          setActiveField(match || parsed[0]);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('Error reading saved fields from localStorage:', e);
-    }
-    setSavedFields(DEFAULT_FIELDS);
-    setActiveField(DEFAULT_FIELDS[0]);
+    const backendUrl = getBackendApiUrl();
+    if (!backendUrl) { setBackendError('Pi API URL is not configured'); return; }
+    let cancelled = false;
+    fetch(`${backendUrl}/api/fields`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Pi farm list returned HTTP ${res.status}`);
+        const fields = await res.json();
+        if (!Array.isArray(fields) || fields.length === 0) throw new Error('Pi has no configured farms');
+        return fields.map(mapPiField);
+      })
+      .then((fields: FarmField[]) => {
+        if (cancelled) return;
+        setSavedFields(fields);
+        const savedId = localStorage.getItem(ACTIVE_FIELD_KEY);
+        setActiveField(fields.find((field) => field.id === savedId) || fields[0]);
+      })
+      .catch((error) => { if (!cancelled) setBackendError(error.message); });
+    return () => { cancelled = true; };
   }, []);
 
   // 1. Fetch live telemetry from server API
   const fetchLiveStatus = useCallback(async () => {
-    if (isDemoMode) return;
+    if (isDemoMode || !activeField) return;
 
     try {
-      const res = await fetch(`/api/farms/${farmId}/status`);
-      if (!res.ok) return;
-      const data = await res.json();
-
-      if (data && !data.error) {
-        setTelemetry(data);
-        if (data.is_demo_mode) {
-          setIsDemoMode(true);
-        } else {
-          setIsDemoMode(false);
-        }
-      }
+      const backendUrl = getBackendApiUrl();
+      if (!backendUrl) throw new Error('Pi API URL is not configured');
+      const res = await fetch(`${backendUrl}/api/status?farm_id=${encodeURIComponent(activeField.id)}`, {
+        cache: 'no-store', signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) throw new Error(`Pi status returned HTTP ${res.status}`);
+      setTelemetry(mapPiStatus(await res.json(), activeField));
+      setBackendReady(true);
+      setBackendError(null);
     } catch (err) {
-      console.warn('Live telemetry polling error:', err);
+      setBackendReady(false);
+      setBackendError(err instanceof Error ? err.message : 'Pi status unavailable');
     }
-  }, [farmId, isDemoMode]);
+  }, [activeField, isDemoMode]);
 
   // Initial mount & periodic polling (every 4 seconds)
   useEffect(() => {
@@ -134,32 +137,7 @@ export default function SmartFarmDashboard() {
     return () => clearInterval(interval);
   }, [fetchLiveStatus]);
 
-  // 2. Fetch Weather using selected field center coordinates
-  const fetchWeatherForCoordinates = useCallback(
-    async (lat: number, lon: number) => {
-      try {
-        const res = await fetch(`/api/farms/${farmId}/weather?lat=${lat}&lon=${lon}`);
-        if (!res.ok) return;
-        const weatherData = await res.json();
-        if (weatherData && !weatherData.is_error) {
-          setTelemetry((prev) => ({
-            ...prev,
-            weather: weatherData,
-          }));
-        }
-      } catch (err) {
-        console.warn('Weather fetch error for field:', err);
-      }
-    },
-    [farmId]
-  );
-
-  // When activeField changes, update weather for its exact center coordinates
-  useEffect(() => {
-    if (activeField?.center?.lat && activeField?.center?.lng) {
-      fetchWeatherForCoordinates(activeField.center.lat, activeField.center.lng);
-    }
-  }, [activeField, fetchWeatherForCoordinates]);
+  // Pi /api/status already supplies the selected farm's weather.
 
   // Field selection / update handlers
   const handleSelectField = (field: FarmField) => {
@@ -268,120 +246,46 @@ export default function SmartFarmDashboard() {
 
   // Handlers for Pump Commands
   const handleStartPump = async (durationSeconds: number) => {
-    setIsCommandPending(true);
-    setCommandStatusMsg(
-      language === 'te'
-        ? 'కమాండ్ పంపబడింది. ఫీల్డ్ గేట్‌వే నిర్ధారణ కొరకు వేచి ఉంది...'
-        : 'Command queued. Awaiting field gateway & Arduino confirmation...'
-    );
-
-    try {
-      const res = await fetch(`/api/devices/${deviceId}/commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'PUMP_ON',
-          duration_seconds: durationSeconds,
-          source: 'manual_web',
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setIsCommandPending(false);
-        alert(language === 'te' ? data.error_te || data.error : data.error);
-        return;
-      }
-
-      if (data.command_id) {
-        setActiveCommandId(data.command_id);
-      }
-
-      if (isDemoMode) {
-        setIsCommandPending(false);
-        setDemoState((prev) => ({
-          ...prev,
-          isPumpRunning: true,
-          pumpDurationSeconds: durationSeconds,
-          pumpStartedAt: Date.now(),
-          pumpSecondsRemaining: durationSeconds,
-        }));
-      }
-    } catch (err: any) {
-      setIsCommandPending(false);
-      alert(err.message || 'Network error');
+    if (!isDemoMode) {
+      alert('Live motor control is disabled until Arduino confirmation is verified.');
+      return;
     }
+    setDemoState((prev) => ({
+      ...prev,
+      isPumpRunning: true,
+      pumpDurationSeconds: durationSeconds,
+      pumpStartedAt: Date.now(),
+      pumpSecondsRemaining: durationSeconds,
+    }));
   };
 
   const handleStopPump = async () => {
-    setIsCommandPending(true);
-    try {
-      await fetch(`/api/devices/${deviceId}/commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'PUMP_OFF',
-          source: 'manual_web',
-        }),
-      });
-
-      if (isDemoMode) {
-        setIsCommandPending(false);
-        setDemoState((prev) => ({
-          ...prev,
-          isPumpRunning: false,
-          pumpStartedAt: null,
-          pumpSecondsRemaining: 0,
-          lastPumpStopAt: Date.now(),
-        }));
-      } else {
-        fetchLiveStatus();
-      }
-    } catch (err) {
-      console.warn('Stop pump error:', err);
+    if (!isDemoMode) {
+      alert('Live motor control is disabled until Arduino confirmation is verified.');
+      return;
     }
+    setDemoState((prev) => ({
+      ...prev,
+      isPumpRunning: false,
+      pumpStartedAt: null,
+      pumpSecondsRemaining: 0,
+      lastPumpStopAt: Date.now(),
+    }));
   };
 
   // Handlers for Farm Assistant Chatbot (using live backend context, strictly via /api/chat)
   const handleProcessVoiceCommand = async (transcript: string) => {
-    const res = await fetch('/api/chat', {
+    const backendUrl = getBackendApiUrl();
+    if (!backendUrl || !farmId) throw new Error('Pi farm connection is unavailable');
+    const res = await fetch(`${backendUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: transcript,
-        transcript,
-        farm_id: farmId,
-        device_id: deviceId,
-        context: {
-          soilMoisture: telemetry.latest_sensor.soil_moisture,
-          temp: telemetry.latest_sensor.temperature,
-          temperature: telemetry.latest_sensor.temperature,
-          humidity: telemetry.latest_sensor.humidity,
-          weather:
-            telemetry.weather.forecast_summary ||
-            (telemetry.weather.rain_probability > 40 ? 'Rainy' : 'Clear'),
-          rainProb: telemetry.weather.rain_probability,
-          rainProbability: telemetry.weather.rain_probability,
-          motorStatus: telemetry.active_pump.is_running ? 'ON' : 'OFF',
-          pumpState: telemetry.active_pump.is_running,
-          pumpTotalTodaySeconds: telemetry.active_pump.total_runtime_today_seconds,
-          recommendationType: telemetry.recommendation.recommendation,
-          irrigationRecommendation:
-            telemetry.recommendation.recommendation === 'IRRIGATE_RECOMMENDED'
-              ? 'IRRIGATE RECOMMENDED'
-              : telemetry.recommendation.recommendation === 'WAIT_RECHECK'
-              ? 'WAIT / RECHECK'
-              : 'MONITOR SOIL',
-          recommendationExplanationTe: telemetry.recommendation.explanation_te,
-          recommendationExplanationEn: telemetry.recommendation.explanation_en,
-          fieldName: activeField?.name || 'North Field',
-          cropType: activeField?.crop || telemetry.farm.crop_type,
-          soilType: telemetry.farm.soil_type,
-        },
-      }),
+      body: JSON.stringify({ message: transcript, farm_id: farmId }),
+      signal: AbortSignal.timeout(30000),
     });
 
     const json = await res.json();
+    if (!res.ok || json.success === false) throw new Error(json.error || 'Pi chatbot unavailable');
 
     // Grok is strictly conversational AI and returns command_result: null.
     // Motor actions are only triggered if command_result is returned by an authorized actuator.
@@ -460,6 +364,18 @@ export default function SmartFarmDashboard() {
     setIsVoIPModalOpen(false);
   };
 
+  if (!backendReady && !isDemoMode) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#f8f9f6] p-6">
+        <div className="max-w-lg rounded-xl border border-stone-200 bg-white p-6 text-stone-800">
+          <h1 className="text-xl font-bold">Smart Farm</h1>
+          <p className="mt-3">{backendError || 'Connecting to Raspberry Pi backend...'}</p>
+          {backendError && <button className="mt-4 rounded bg-emerald-700 px-4 py-2 text-white" onClick={() => window.location.reload()}>Retry connection</button>}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#f8f9f6] dark:bg-[#0d1512] text-stone-900 dark:text-stone-100">
       {/* ==================== 1. HEADER ==================== */}
@@ -481,6 +397,11 @@ export default function SmartFarmDashboard() {
 
       {/* ==================== MAIN CONTENT CONTAINER ==================== */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {!isDemoMode && telemetry.source === 'raspberry_pi' && (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">
+            Connected to Raspberry Pi backend{telemetry.is_demo_mode ? ' • Pi sensor simulation is active; Arduino is not connected' : ''}.
+          </div>
+        )}
         {/* Offline notice if gateway is disconnected */}
         {telemetry.device.is_stale && !isDemoMode && (
           <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-xs flex items-center justify-between">
@@ -505,9 +426,10 @@ export default function SmartFarmDashboard() {
           isMotorRunning={telemetry.active_pump.is_running}
           isMotorPending={isCommandPending || telemetry.active_pump.is_pending}
           remainingSeconds={telemetry.active_pump.remaining_seconds}
+          sensorLabel={telemetry.is_demo_mode ? 'Pi simulation' : 'Arduino sensor'}
           language={language}
-          onQuickStartPump={handleStartPump}
-          onQuickStopPump={handleStopPump}
+          onQuickStartPump={isDemoMode ? handleStartPump : undefined}
+          onQuickStopPump={isDemoMode ? handleStopPump : undefined}
         />
 
         {/* ==================== 3. MAIN CONTENT ==================== */}
@@ -516,6 +438,7 @@ export default function SmartFarmDashboard() {
           recommendation={telemetry.recommendation}
           isPumpRunning={telemetry.active_pump.is_running}
           language={language}
+          controlsEnabled={isDemoMode}
           onConfirmIrrigation={handleStartPump}
           onRejectIrrigation={() => {
             alert(
@@ -537,6 +460,7 @@ export default function SmartFarmDashboard() {
               language={language}
               onSelectField={handleSelectField}
               onSaveField={handleSaveField}
+              readOnly={!isDemoMode}
             />
           </div>
 
@@ -566,6 +490,7 @@ export default function SmartFarmDashboard() {
             language={language}
             onSelectField={handleSelectField}
             onDeleteField={handleDeleteField}
+            readOnly={!isDemoMode}
             onAddNewField={() => {
               const el = document.getElementById('btn-add-field');
               if (el) {
@@ -578,7 +503,7 @@ export default function SmartFarmDashboard() {
 
         {/* Supplementary Controls: Pump Controller & Analytics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <PumpControlCard
+          {isDemoMode ? <PumpControlCard
             isRunning={telemetry.active_pump.is_running}
             isPending={isCommandPending || telemetry.active_pump.is_pending}
             commandStatus={telemetry.active_pump.command_status}
@@ -589,9 +514,14 @@ export default function SmartFarmDashboard() {
             language={language}
             onStartPump={handleStartPump}
             onStopPump={handleStopPump}
-          />
+          /> : <div className="farm-card p-5 text-sm text-stone-700">
+            <h3 className="font-bold">Motor status: {telemetry.active_pump.is_running ? 'ON' : 'OFF'}</h3>
+            <p className="mt-2">Live motor controls are disabled until Arduino command acknowledgement is verified.</p>
+          </div>}
 
-          <HistoricalCharts farmId={farmId} language={language} />
+          {isDemoMode ? <HistoricalCharts farmId={farmId} language={language} /> : (
+            <div className="farm-card p-5 text-sm text-stone-600">Historical charts are unavailable until the Pi backend records and exposes history.</div>
+          )}
         </div>
       </main>
 

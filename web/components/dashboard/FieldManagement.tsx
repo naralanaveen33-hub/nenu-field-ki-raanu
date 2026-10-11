@@ -11,6 +11,7 @@ interface FieldManagementProps {
   onSelectField: (field: FarmField) => void;
   onDeleteField: (fieldId: string) => void;
   onAddNewField: () => void;
+  readOnly?: boolean;
 }
 
 export const FieldManagement: React.FC<FieldManagementProps> = ({
@@ -20,6 +21,7 @@ export const FieldManagement: React.FC<FieldManagementProps> = ({
   onSelectField,
   onDeleteField,
   onAddNewField,
+  readOnly = false,
 }) => {
   return (
     <div className="farm-card p-4 sm:p-5 flex flex-col justify-between" id="field-management-card">
@@ -41,14 +43,14 @@ export const FieldManagement: React.FC<FieldManagementProps> = ({
             </div>
           </div>
 
-          <button
+          {!readOnly && <button
             type="button"
             onClick={onAddNewField}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors"
           >
             <Plus className="h-3 w-3" />
             <span>{language === 'te' ? 'కొత్తది' : 'Add'}</span>
-          </button>
+          </button>}
         </div>
 
         {/* Fields List */}
@@ -97,7 +99,7 @@ export const FieldManagement: React.FC<FieldManagementProps> = ({
                 </div>
 
                 {/* Delete button (if more than 1 field) */}
-                {fields.length > 1 && (
+                {!readOnly && fields.length > 1 && (
                   <button
                     type="button"
                     onClick={(e) => {

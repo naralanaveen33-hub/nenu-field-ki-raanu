@@ -104,7 +104,7 @@ export const WeatherCard: React.FC<WeatherCardProps> = ({ weather, activeField, 
               : (language === 'te' ? 'పొలం లొకేషన్ ఆధారంగా' : 'Anchored to field center')}
           </span>
         </div>
-        <span>{weather.precipitation_mm > 0 ? `${weather.precipitation_mm}mm rain` : 'No precipitation'}</span>
+        <span>{weather.precipitation_unknown ? 'Precipitation unavailable' : weather.precipitation_mm > 0 ? `${weather.precipitation_mm}mm rain` : 'No precipitation'}</span>
       </div>
     </div>
   );

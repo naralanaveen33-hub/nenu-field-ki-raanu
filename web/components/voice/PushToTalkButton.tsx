@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Volume2, Sparkles, AlertCircle, Loader2, Send, Bot } from 'lucide-react';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 interface PushToTalkButtonProps {
   onProcessCommand: (transcript: string) => Promise<{
@@ -36,7 +37,7 @@ export const PushToTalkButton: React.FC<PushToTalkButtonProps> = ({
 
   // 1. Check backend Grok availability truthfully on mount
   useEffect(() => {
-    fetch('/api/chat')
+    fetch(`${getBackendApiUrl()}/api/chat`)
       .then((res) => res.json())
       .then((data) => {
         if (data.status === 'available') {

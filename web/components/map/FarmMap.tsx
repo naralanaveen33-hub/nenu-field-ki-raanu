@@ -22,6 +22,7 @@ interface FarmMapProps {
   language: 'te' | 'en';
   onSelectField: (field: FarmField) => void;
   onSaveField: (field: FarmField) => void;
+  readOnly?: boolean;
 }
 
 export const FarmMap: React.FC<FarmMapProps> = (props) => {

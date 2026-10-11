@@ -13,6 +13,7 @@ interface FarmMapLeafletProps {
   language: 'te' | 'en';
   onSelectField: (field: FarmField) => void;
   onSaveField: (field: FarmField) => void;
+  readOnly?: boolean;
 }
 
 export default function FarmMapLeaflet({
@@ -22,6 +23,7 @@ export default function FarmMapLeaflet({
   language,
   onSelectField,
   onSaveField,
+  readOnly = false,
 }: FarmMapLeafletProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -393,7 +395,7 @@ export default function FarmMapLeaflet({
           </button>
 
           {/* Button 2: [＋ Add field] */}
-          {!isDrawing ? (
+          {!readOnly && (!isDrawing ? (
             <button
               type="button"
               id="btn-add-field"
@@ -413,10 +415,10 @@ export default function FarmMapLeaflet({
               <RotateCcw className="h-3.5 w-3.5" />
               <span>{language === 'te' ? 'రద్దు చేయి' : 'Cancel'}</span>
             </button>
-          )}
+          ))}
 
           {/* Button 3: [Save field] */}
-          {isDrawing && (
+          {!readOnly && isDrawing && (
             <button
               type="button"
               id="btn-save-field"
