@@ -11,7 +11,6 @@ import { FieldManagement } from '@/components/dashboard/FieldManagement';
 import { PushToTalkButton } from '@/components/voice/PushToTalkButton';
 import { VoIPCallModal } from '@/components/calling/VoIPCallModal';
 import { HistoricalCharts } from '@/components/analytics/HistoricalCharts';
-import { DemoControlDrawer } from '@/components/demo/DemoControlDrawer';
 
 import {
   getInitialDemoState,
@@ -65,7 +64,7 @@ const DEFAULT_FIELDS: FarmField[] = [
 
 export default function SmartFarmDashboard() {
   const [language, setLanguage] = useState<'te' | 'en'>('te');
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const isDemoMode = false;
   const [demoState, setDemoState] = useState<DemoState>(getInitialDemoState());
   const [telemetry, setTelemetry] = useState<TelemetrySummary>(
     computeDemoTelemetry(demoState)
@@ -81,7 +80,6 @@ export default function SmartFarmDashboard() {
   const [isCommandPending, setIsCommandPending] = useState<boolean>(false);
   const [activeCommandId, setActiveCommandId] = useState<string | null>(null);
   const [commandStatusMsg, setCommandStatusMsg] = useState<string | null>(null);
-  const [isDemoDrawerOpen, setIsDemoDrawerOpen] = useState(false);
   const [activeVoIPCall, setActiveVoIPCall] = useState<ActiveCallState | null>(null);
   const [isVoIPModalOpen, setIsVoIPModalOpen] = useState(false);
 
@@ -409,14 +407,9 @@ export default function SmartFarmDashboard() {
         currentField={activeField}
         fields={savedFields}
         onSelectField={handleSelectField}
-        isDemoMode={isDemoMode}
         language={language}
         onToggleLanguage={() => setLanguage((l) => (l === 'te' ? 'en' : 'te'))}
         onOpenVoIPCall={handleTriggerVoIPCall}
-        onToggleDemoDrawer={() => {
-          setIsDemoMode(true);
-          setIsDemoDrawerOpen(true);
-        }}
       />
 
       {/* ==================== MAIN CONTENT CONTAINER ==================== */}
@@ -564,36 +557,6 @@ export default function SmartFarmDashboard() {
         onAnswer={handleAnswerCall}
         onConfirm={handleConfirmCallIrrigation}
         onEnd={handleEndCall}
-        language={language}
-      />
-
-      {/* Interactive Demo Simulation Drawer */}
-      <DemoControlDrawer
-        isOpen={isDemoDrawerOpen}
-        onClose={() => setIsDemoDrawerOpen(false)}
-        soilMoisture={demoState.soilMoisture}
-        onSoilMoistureChange={(val) =>
-          setDemoState((prev) => ({ ...prev, soilMoisture: val }))
-        }
-        isRainSimulated={demoState.isRainSimulated}
-        onToggleRain={() =>
-          setDemoState((prev) => ({ ...prev, isRainSimulated: !prev.isRainSimulated }))
-        }
-        isGatewayOnline={demoState.device.status === 'online'}
-        onToggleGatewayOnline={() =>
-          setDemoState((prev) => ({
-            ...prev,
-            device: {
-              ...prev.device,
-              status: prev.device.status === 'online' ? 'offline' : 'online',
-            },
-          }))
-        }
-        onResetDemo={() => {
-          setIsDemoMode(false);
-          setIsDemoDrawerOpen(false);
-          fetchLiveStatus();
-        }}
         language={language}
       />
 

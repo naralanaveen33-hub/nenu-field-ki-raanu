@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sprout, Phone, Settings2, Sparkles, MapPin, ChevronDown } from 'lucide-react';
+import { Sprout, Phone, MapPin, ChevronDown } from 'lucide-react';
 import { Farm, Device, FarmField } from '@/types';
 
 interface NavbarProps {
@@ -10,11 +10,9 @@ interface NavbarProps {
   currentField?: FarmField | null;
   fields?: FarmField[];
   onSelectField?: (field: FarmField) => void;
-  isDemoMode: boolean;
   language: 'te' | 'en';
   onToggleLanguage: () => void;
   onOpenVoIPCall: () => void;
-  onToggleDemoDrawer: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -23,11 +21,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentField,
   fields = [],
   onSelectField,
-  isDemoMode,
   language,
   onToggleLanguage,
   onOpenVoIPCall,
-  onToggleDemoDrawer,
 }) => {
   const isOnline = device.status === 'online' && !device.is_stale;
 
@@ -48,11 +44,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-700">
                   {farm.name}
                 </span>
-                {isDemoMode && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                    <Sparkles className="h-2.5 w-2.5" /> Demo
-                  </span>
-                )}
               </div>
               <p className="text-xs text-stone-500 dark:text-stone-400">
                 {language === 'te' ? 'రైతు సాగు పర్యవేక్షణ & నీటి నిర్వహణ' : 'Precision Irrigation & Field Monitoring'}
@@ -127,13 +118,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               {language === 'te' ? 'English' : 'తెలుగు'}
             </button>
 
-            <button
-              onClick={onToggleDemoDrawer}
-              aria-label="Simulation Settings"
-              className="p-1.5 rounded-lg text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-            >
-              <Settings2 className="h-4 w-4" />
-            </button>
           </div>
         </div>
       </div>
