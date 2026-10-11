@@ -14,10 +14,11 @@ class LiveMotorApiTests(unittest.TestCase):
             "farm_id": "field-101",
             "is_hardware": True,
             "motor": 0,
+            "moisture": 25.0,
             "source": "arduino_json",
         }
         self.sensor_lookup = patch.object(
-            sensor_manager, "get_sensor_for_farm", return_value=dict(self.sensor)
+            sensor_manager, "get_sensor_for_farm", side_effect=lambda *_args: dict(self.sensor)
         )
         self.sensor_lookup.start()
         self.set_motor = patch.object(sensor_manager, "set_motor_state")
@@ -79,6 +80,30 @@ class LiveMotorApiTests(unittest.TestCase):
         self.assertEqual(response.json["error"], "motor_command_failed")
         self.request_off_mock.assert_not_called()
         self.set_motor_mock.assert_not_called()
+
+    def test_motor_start_is_blocked_at_high_moisture(self):
+        self.sensor["moisture"] = 75.0
+
+        response = self.client.post(
+            "/api/motor/on", json={"farm_id": "field-101", "confirmed": True}
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json["error"], "soil_moisture_sufficient")
+        self.send_mock.assert_not_called()
+        self.request_on_mock.assert_not_called()
+
+    def test_motor_start_is_blocked_when_calibrated_moisture_is_missing(self):
+        self.sensor["moisture"] = None
+
+        response = self.client.post(
+            "/api/motor/on", json={"farm_id": "field-101", "confirmed": True}
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json["error"], "soil_moisture_unavailable")
+        self.send_mock.assert_not_called()
+        self.request_on_mock.assert_not_called()
 
 
 if __name__ == "__main__":

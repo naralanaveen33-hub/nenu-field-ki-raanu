@@ -345,6 +345,22 @@ def _send_motor_action(target_on: bool):
                 "error": "arduino_not_live",
                 "message": "No recent valid Arduino packets are available; motor command was not sent."
             }), 503
+        if target_on:
+            moisture = sensor.get("moisture")
+            if moisture is None:
+                return jsonify({
+                    "success": False,
+                    "error": "soil_moisture_unavailable",
+                    "message": "Motor start is blocked because calibrated soil moisture is unavailable."
+                }), 409
+            if float(moisture) >= 40.0:
+                return jsonify({
+                    "success": False,
+                    "error": "soil_moisture_sufficient",
+                    "moisture": float(moisture),
+                    "threshold": 40.0,
+                    "message": "Motor start is blocked because soil moisture is already at or above 40%."
+                }), 409
 
     operator = body.get("operator", "farmer_dashboard")
     action = "MOTOR_ON" if target_on else "MOTOR_OFF"

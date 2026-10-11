@@ -313,6 +313,14 @@ export default function SmartFarmDashboard() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.success !== true) {
+      if (result.error === 'soil_moisture_sufficient') {
+        throw new Error(language === 'te'
+          ? `మట్టి తేమ ${Number(result.moisture).toFixed(1)}% ఉంది. 40% లేదా అంతకంటే ఎక్కువైతే మోటార్ ఆన్ చేయలేరు.`
+          : `Soil moisture is ${Number(result.moisture).toFixed(1)}%. Motor ON is blocked at 40% or higher.`);
+      }
+      if (result.error === 'soil_moisture_unavailable') {
+        throw new Error(language === 'te' ? 'కాలిబ్రేట్ చేసిన తేమ అందుబాటులో లేదు. మోటార్ ఆన్ చేయలేదు.' : 'Calibrated soil moisture is unavailable. Motor ON was blocked.');
+      }
       throw new Error(result.message || result.error || `Pi rejected the motor command (HTTP ${response.status}).`);
     }
 
@@ -589,6 +597,7 @@ export default function SmartFarmDashboard() {
           /> : <LiveMotorControlCard
             isRunning={telemetry.active_pump.is_running}
             isConnected={Boolean(telemetry.serial_connected && !telemetry.is_demo_mode)}
+            moisture={telemetry.latest_sensor.soil_moisture}
             language={language}
             onSetMotor={handleSetLiveMotor}
           />}

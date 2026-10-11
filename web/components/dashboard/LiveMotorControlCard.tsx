@@ -8,6 +8,7 @@ type MotorTarget = 'on' | 'off';
 interface LiveMotorControlCardProps {
   isRunning: boolean;
   isConnected: boolean;
+  moisture: number | null;
   language: 'te' | 'en';
   onSetMotor: (target: MotorTarget) => Promise<string>;
 }
@@ -15,12 +16,14 @@ interface LiveMotorControlCardProps {
 export const LiveMotorControlCard: React.FC<LiveMotorControlCardProps> = ({
   isRunning,
   isConnected,
+  moisture,
   language,
   onSetMotor,
 }) => {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const isTelugu = language === 'te';
+  const moistureBlocksStart = moisture === null || moisture >= 40;
 
   const requestMotorState = async (target: MotorTarget) => {
     const prompt = target === 'on'
@@ -69,10 +72,18 @@ export const LiveMotorControlCard: React.FC<LiveMotorControlCardProps> = ({
           : 'Manual controls only. The motor will not stop automatically when soil moisture rises.'}
       </p>
 
+      {moistureBlocksStart && (
+        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200" role="status">
+          {moisture === null
+            ? (isTelugu ? 'కాలిబ్రేట్ చేసిన మట్టి తేమ అందుబాటులో లేదు. మోటార్ ఆన్ చేయడం నిలిపివేయబడింది.' : 'Calibrated soil moisture is unavailable. Motor ON is blocked.')
+            : (isTelugu ? `మట్టి తేమ ${moisture.toFixed(1)}% ఉంది. 40% లేదా అంతకంటే ఎక్కువైతే మోటార్ ఆన్ చేయలేరు.` : `Soil moisture is ${moisture.toFixed(1)}%. Motor ON is blocked at 40% or higher.`)}
+        </p>
+      )}
+
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           type="button"
-          disabled={!isConnected || busy || isRunning}
+          disabled={!isConnected || moistureBlocksStart || busy || isRunning}
           onClick={() => requestMotorState('on')}
           className="rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
         >
