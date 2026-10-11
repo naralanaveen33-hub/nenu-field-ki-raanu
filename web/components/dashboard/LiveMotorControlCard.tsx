@@ -55,8 +55,12 @@ export const LiveMotorControlCard: React.FC<LiveMotorControlCardProps> = ({
             {isTelugu ? 'మోటార్ నియంత్రణ' : 'Motor control'}
           </p>
           <h3 className="mt-1 flex items-center gap-2 text-lg font-bold text-stone-900 dark:text-stone-100">
-            <Power className={`h-5 w-5 ${isRunning ? 'text-emerald-600' : 'text-stone-400'}`} />
-            {isTelugu ? (isRunning ? 'మోటార్ ఆన్‌లో ఉంది' : 'మోటార్ ఆఫ్‌లో ఉంది') : (isRunning ? 'Motor is ON' : 'Motor is OFF')}
+            <Power className={`h-5 w-5 ${isConnected && isRunning ? 'text-emerald-600' : 'text-stone-400'}`} />
+            {!isConnected
+              ? (isTelugu ? 'మోటార్ స్థితి తెలియదు' : 'Motor status unknown')
+              : isTelugu
+                ? (isRunning ? 'మోటార్ ఆన్‌లో ఉంది' : 'మోటార్ ఆఫ్‌లో ఉంది')
+                : (isRunning ? 'Motor is ON' : 'Motor is OFF')}
           </h3>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isConnected
