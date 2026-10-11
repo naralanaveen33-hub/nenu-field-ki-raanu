@@ -12,6 +12,7 @@ interface FieldManagementProps {
   onDeleteField: (fieldId: string) => void;
   onAddNewField: () => void;
   readOnly?: boolean;
+  canDelete?: boolean;
 }
 
 export const FieldManagement: React.FC<FieldManagementProps> = ({
@@ -22,6 +23,7 @@ export const FieldManagement: React.FC<FieldManagementProps> = ({
   onDeleteField,
   onAddNewField,
   readOnly = false,
+  canDelete = false,
 }) => {
   return (
     <div className="farm-card p-4 sm:p-5 flex flex-col justify-between" id="field-management-card">
@@ -99,7 +101,7 @@ export const FieldManagement: React.FC<FieldManagementProps> = ({
                 </div>
 
                 {/* Delete button (if more than 1 field) */}
-                {!readOnly && fields.length > 1 && (
+                {(!readOnly || canDelete) && fields.length > 1 && (
                   <button
                     type="button"
                     onClick={(e) => {

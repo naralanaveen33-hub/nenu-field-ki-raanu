@@ -157,11 +157,35 @@ export default function SmartFarmDashboard() {
     } catch (e) {}
   };
 
-  const handleDeleteField = (fieldId: string) => {
+  const handleDeleteField = async (fieldId: string) => {
     const updated = savedFields.filter((f) => f.id !== fieldId);
+    if (updated.length === 0) return;
+    if (!isDemoMode) {
+      const backendUrl = getBackendApiUrl();
+      if (!backendUrl) {
+        alert(language === 'te' ? 'Pi API URL అందుబాటులో లేదు.' : 'Pi API URL is not configured.');
+        return;
+      }
+      try {
+        const response = await fetch(`${backendUrl}/api/fields/${encodeURIComponent(fieldId)}`, {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || `Delete failed (HTTP ${response.status})`);
+        }
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Could not delete field from the Raspberry Pi.');
+        return;
+      }
+    }
     setSavedFields(updated);
     if (activeField?.id === fieldId && updated.length > 0) {
       setActiveField(updated[0]);
+      try {
+        localStorage.setItem(ACTIVE_FIELD_KEY, updated[0].id);
+      } catch (e) {}
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -497,6 +521,7 @@ export default function SmartFarmDashboard() {
             onSelectField={handleSelectField}
             onDeleteField={handleDeleteField}
             readOnly={!isDemoMode}
+            canDelete={!isDemoMode}
             onAddNewField={() => {
               const el = document.getElementById('btn-add-field');
               if (el) {

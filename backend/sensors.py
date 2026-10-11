@@ -140,6 +140,15 @@ class SensorManager:
             self._save_to_disk_locked()
             return dict(new_sensor)
 
+    def remove_farm(self, farm_id: str) -> bool:
+        """Remove the sensor record for a deleted farm."""
+        with self.lock:
+            if farm_id not in self._sensors:
+                return False
+            del self._sensors[farm_id]
+            self._save_to_disk_locked()
+            return True
+
     def get_sensor_for_farm(self, farm_id: Optional[str]) -> Optional[dict]:
         """
         Return the single sensor data for the specified farm_id.

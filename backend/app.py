@@ -449,6 +449,26 @@ def save_field():
 
     return jsonify({"success": True, "field": new_field}), 201
 
+@app.route("/api/fields/<field_id>", methods=["DELETE"])
+def delete_field(field_id):
+    fields = load_fields_list()
+    field_index = next((i for i, field in enumerate(fields) if field.get("id") == field_id), None)
+    if field_index is None:
+        return jsonify({"error": "Field not found"}), 404
+    if len(fields) <= 1:
+        return jsonify({"error": "At least one field must remain"}), 409
+
+    deleted_field = fields.pop(field_index)
+    try:
+        with open(FIELDS_FILE, "w", encoding="utf-8") as f:
+            json.dump(fields, f, indent=2, ensure_ascii=False)
+    except OSError as error:
+        app.logger.exception("Could not save field list after deletion")
+        return jsonify({"error": "Could not delete field", "detail": str(error)}), 500
+
+    sensor_manager.remove_farm(field_id)
+    return jsonify({"success": True, "deleted_field": deleted_field, "remaining_fields": len(fields)})
+
 @app.route("/api/chat", methods=["GET", "POST"])
 def chat():
     if request.method == "GET":
