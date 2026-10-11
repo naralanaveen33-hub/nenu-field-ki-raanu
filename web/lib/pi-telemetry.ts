@@ -25,6 +25,17 @@ export function hasVerifiedLiveArduinoStatus(data: any, farmId: string): boolean
     Number.isFinite(Number(sensor?.soil_raw));
 }
 
+export function hasKnownArduinoFieldStatus(data: any, farmId: string): boolean {
+  const sensor = data?.sensor || data?.sensors;
+  return data?.farm_selected === true &&
+    data?.farm_id === farmId &&
+    sensor?.farm_id === farmId &&
+    sensor?.is_hardware === true &&
+    sensor?.is_demo === false &&
+    typeof sensor?.source === 'string' && sensor.source.startsWith('arduino') &&
+    Number.isFinite(Number(sensor?.soil_raw));
+}
+
 export function mapPiField(field: PiField): FarmField {
   if (!field.id || !field.name) throw new Error('Pi returned an invalid farm');
   const coordinates = Array.isArray(field.coordinates) ? field.coordinates : [];
@@ -63,6 +74,8 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
   const recommendation = code.includes('NOT REQUIRED') ? 'DO_NOT_IRRIGATE'
     : code.includes('RECOMMENDED') ? 'IRRIGATE_RECOMMENDED' : 'WAIT_RECHECK';
   const demo = data.demo_mode === true;
+  const liveArduino = hasVerifiedLiveArduinoStatus(data, field.id);
+  const stale = !liveArduino || ageSeconds > 120;
 
   return {
     farm: {
@@ -84,7 +97,7 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
       device_type: 'gateway',
       // This device represents the Pi API; Arduino connectivity is separate.
       status: 'online',
-      is_stale: !demo && ageSeconds > 120,
+      is_stale: stale,
       last_seen: readingAt,
       created_at: field.created_at,
     },
@@ -95,7 +108,7 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
       soil_moisture: moisture,
       ...(soilRaw === null ? {} : { soil_raw: soilRaw }),
       recorded_at: readingAt,
-      is_stale: !demo && ageSeconds > 120,
+      is_stale: stale,
     },
     active_pump: {
       is_running: data.motor?.is_on === true,
@@ -125,9 +138,9 @@ export function mapPiStatus(data: any, field: FarmField): TelemetrySummary {
       soil_moisture: moisture,
       rain_probability: Number(weather.rain_probability),
       precipitation_mm: 0,
-      recommendation,
-      explanation_en: advice.reason || '',
-      explanation_te: advice.reason_te || '',
+      recommendation: liveArduino ? recommendation : 'WAIT_RECHECK',
+      explanation_en: liveArduino ? (advice.reason || '') : 'Arduino connection is offline. Wait for a new live sensor reading before irrigating.',
+      explanation_te: liveArduino ? (advice.reason_te || '') : 'ఆర్డునో కనెక్షన్ లేదు. నీరు పెట్టే ముందు కొత్త ప్రత్యక్ష సెన్సార్ రీడింగ్ కోసం వేచి ఉండండి.',
       suggested_duration_seconds: 0,
       requires_confirmation: true,
       is_confirmed: false,

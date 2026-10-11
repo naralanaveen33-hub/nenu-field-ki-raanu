@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hasVerifiedLiveArduinoStatus, mapPiField, mapPiStatus } from '../lib/pi-telemetry';
+import { hasKnownArduinoFieldStatus, hasVerifiedLiveArduinoStatus, mapPiField, mapPiStatus } from '../lib/pi-telemetry';
 
 const field = mapPiField({
   id: 'field-101', name: 'North Paddy Field', crop: 'Paddy', area_acres: 1,
@@ -23,7 +23,8 @@ test('Pi status uses the selected farm and its sensor reading', () => {
   const telemetry = mapPiStatus(piStatus, field);
   assert.equal(telemetry.farm.id, 'field-101');
   assert.equal(telemetry.latest_sensor.soil_moisture, 24);
-  assert.equal(telemetry.recommendation.recommendation, 'IRRIGATE_RECOMMENDED');
+  assert.equal(telemetry.recommendation.recommendation, 'WAIT_RECHECK');
+  assert.equal(telemetry.latest_sensor.is_stale, true);
   assert.equal(telemetry.source, 'raspberry_pi');
   assert.equal(telemetry.serial_connected, false);
   assert.equal(telemetry.is_demo_mode, true);
@@ -72,7 +73,7 @@ test('Pi calibrated Arduino percentage is passed through with the raw ADC', () =
   assert.equal(telemetry.latest_sensor.soil_raw, 1003);
 });
 
-test('farm-list fallback requires a live Arduino packet for the hardware field', () => {
+test('saved field remains visible with known Arduino history while live status stays strict', () => {
   const liveStatus = {
     farm_selected: true, farm_id: 'field-101', demo_mode: false,
     serial_connected: true, serial_port_open: true, arduino_data_received: true,
@@ -83,6 +84,9 @@ test('farm-list fallback requires a live Arduino packet for the hardware field',
     },
   };
   assert.equal(hasVerifiedLiveArduinoStatus(liveStatus, 'field-101'), true);
+  assert.equal(hasKnownArduinoFieldStatus(liveStatus, 'field-101'), true);
+  assert.equal(hasKnownArduinoFieldStatus({ ...liveStatus, serial_connected: false, arduino_data_received: false, demo_mode: true }, 'field-101'), true);
+  assert.equal(hasKnownArduinoFieldStatus({ ...liveStatus, sensor: { ...liveStatus.sensor, is_hardware: false } }, 'field-101'), false);
   assert.equal(hasVerifiedLiveArduinoStatus({ ...liveStatus, demo_mode: true }, 'field-101'), false);
   assert.equal(hasVerifiedLiveArduinoStatus({ ...liveStatus, farm_id: 'field-102' }, 'field-101'), false);
   assert.equal(hasVerifiedLiveArduinoStatus({ ...liveStatus, serial_connected: false }, 'field-101'), false);

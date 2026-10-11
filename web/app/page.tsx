@@ -21,7 +21,7 @@ import {
 import { TelemetrySummary, FarmField } from '@/types';
 import { ActiveCallState } from '@/lib/calling/types';
 import { getBackendApiUrl } from '@/lib/api-config';
-import { hasVerifiedLiveArduinoStatus, mapPiField, mapPiStatus } from '@/lib/pi-telemetry';
+import { hasKnownArduinoFieldStatus, mapPiField, mapPiStatus } from '@/lib/pi-telemetry';
 import savedFarmDefinitions from '@/data/fields.json';
 
 const STORAGE_KEY = 'smartfarm_saved_fields';
@@ -110,8 +110,8 @@ export default function SmartFarmDashboard() {
             { cache: 'no-store', signal: AbortSignal.timeout(8000) },
           );
           const status = await statusResponse.json();
-          if (!statusResponse.ok || !hasVerifiedLiveArduinoStatus(status, VERIFIED_HARDWARE_FIELD_ID)) {
-            throw new Error('Pi has no configured farms or verified live Arduino data');
+          if (!statusResponse.ok || !hasKnownArduinoFieldStatus(status, VERIFIED_HARDWARE_FIELD_ID)) {
+            throw new Error('Pi has no configured farms or known Arduino field data');
           }
           fields = [fallback];
           usingFallback = true;
@@ -503,7 +503,7 @@ export default function SmartFarmDashboard() {
         )}
         {usingVerifiedFieldFallback && (
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            Pi farm settings need restoring. Showing the saved field only while its live Arduino connection is verified.
+            Pi farm settings need restoring. Showing the saved Arduino field; readings are marked stale whenever its connection is offline.
           </div>
         )}
         {/* Offline notice if gateway is disconnected */}

@@ -38,6 +38,11 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
 
   return (
     <section aria-label="Top Agricultural Metrics">
+      {device.is_stale && (
+        <p className="mb-3 text-sm font-semibold text-amber-800 dark:text-amber-300">
+          {language === 'te' ? 'చివరి ఆర్డునో రీడింగ్' : 'Last Arduino reading'}: {new Date(sensor.recorded_at).toLocaleTimeString()}
+        </p>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. SOIL MOISTURE */}
         <div className="farm-card p-4 sm:p-5 flex flex-col justify-between">
@@ -130,23 +135,25 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
           <div>
             <div className="flex items-center justify-between text-xs text-stone-500 dark:text-stone-400 font-medium mb-1">
               <span>{language === 'te' ? 'మోటార్ స్థితి' : 'Motor Status'}</span>
-              <Power className={`h-4 w-4 ${isMotorRunning ? 'text-emerald-600' : 'text-stone-400'}`} />
+              <Power className={`h-4 w-4 ${!device.is_stale && isMotorRunning ? 'text-emerald-600' : 'text-stone-400'}`} />
             </div>
 
             <div className="flex items-baseline gap-2 mt-1">
               <span
                 className={`text-3xl sm:text-4xl font-extrabold tracking-tight font-mono ${
-                  isMotorRunning
+                  device.is_stale
+                    ? 'text-amber-700 dark:text-amber-400'
+                    : isMotorRunning
                     ? 'text-emerald-700 dark:text-emerald-400'
                     : isMotorPending
                     ? 'text-amber-600 dark:text-amber-400'
                     : 'text-stone-700 dark:text-stone-300'
                 }`}
               >
-                {isMotorRunning ? 'ON' : isMotorPending ? 'PENDING' : 'OFF'}
+                {device.is_stale ? 'UNKNOWN' : isMotorRunning ? 'ON' : isMotorPending ? 'PENDING' : 'OFF'}
               </span>
 
-              {isMotorRunning && remainingSeconds > 0 && (
+              {!device.is_stale && isMotorRunning && remainingSeconds > 0 && (
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                   {formatSecondsToMinutes(remainingSeconds)}
                 </span>
@@ -156,7 +163,9 @@ export const TelemetryGrid: React.FC<TelemetryGridProps> = ({
 
           <div className="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs">
             <span className="text-stone-500 dark:text-stone-400">
-              {isMotorRunning
+              {device.is_stale
+                ? (language === 'te' ? 'ఆర్డునో స్థితి అందుబాటులో లేదు' : 'Arduino status unavailable')
+                : isMotorRunning
                 ? (language === 'te' ? 'నీటి పారుదల నడుస్తోంది' : 'Irrigating')
                 : isMotorPending
                 ? (language === 'te' ? 'గేట్‌వే నిర్ధారణ కొరకు వేచి ఉంది' : 'Awaiting Gateway ACK')
