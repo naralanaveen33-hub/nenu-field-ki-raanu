@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPiField, mapPiStatus } from '../lib/pi-telemetry';
+import { hasVerifiedLiveArduinoStatus, mapPiField, mapPiStatus } from '../lib/pi-telemetry';
 
 const field = mapPiField({
   id: 'field-101', name: 'North Paddy Field', crop: 'Paddy', area_acres: 1,
@@ -70,4 +70,20 @@ test('Pi calibrated Arduino percentage is passed through with the raw ADC', () =
   }, field);
   assert.equal(telemetry.latest_sensor.soil_moisture, 0);
   assert.equal(telemetry.latest_sensor.soil_raw, 1003);
+});
+
+test('farm-list fallback requires a live Arduino packet for the hardware field', () => {
+  const liveStatus = {
+    farm_selected: true, farm_id: 'field-101', demo_mode: false,
+    serial_connected: true, serial_port_open: true, arduino_data_received: true,
+    arduino_packet_sequence: 12,
+    sensor: {
+      farm_id: 'field-101', is_hardware: true, is_demo: false,
+      source: 'arduino_json', soil_raw: 1001,
+    },
+  };
+  assert.equal(hasVerifiedLiveArduinoStatus(liveStatus, 'field-101'), true);
+  assert.equal(hasVerifiedLiveArduinoStatus({ ...liveStatus, demo_mode: true }, 'field-101'), false);
+  assert.equal(hasVerifiedLiveArduinoStatus({ ...liveStatus, farm_id: 'field-102' }, 'field-101'), false);
+  assert.equal(hasVerifiedLiveArduinoStatus({ ...liveStatus, serial_connected: false }, 'field-101'), false);
 });

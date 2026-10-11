@@ -9,6 +9,22 @@ type PiField = {
   created_at?: string;
 };
 
+export function hasVerifiedLiveArduinoStatus(data: any, farmId: string): boolean {
+  const sensor = data?.sensor || data?.sensors;
+  return data?.farm_selected === true &&
+    data?.farm_id === farmId &&
+    data?.serial_connected === true &&
+    data?.serial_port_open === true &&
+    data?.arduino_data_received === true &&
+    data?.demo_mode === false &&
+    Number(data?.arduino_packet_sequence) > 0 &&
+    sensor?.farm_id === farmId &&
+    sensor?.is_hardware === true &&
+    sensor?.is_demo === false &&
+    typeof sensor?.source === 'string' && sensor.source.startsWith('arduino') &&
+    Number.isFinite(Number(sensor?.soil_raw));
+}
+
 export function mapPiField(field: PiField): FarmField {
   if (!field.id || !field.name) throw new Error('Pi returned an invalid farm');
   const coordinates = Array.isArray(field.coordinates) ? field.coordinates : [];

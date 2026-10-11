@@ -21,10 +21,12 @@ import {
 import { TelemetrySummary, FarmField } from '@/types';
 import { ActiveCallState } from '@/lib/calling/types';
 import { getBackendApiUrl } from '@/lib/api-config';
-import { mapPiField, mapPiStatus } from '@/lib/pi-telemetry';
+import { hasVerifiedLiveArduinoStatus, mapPiField, mapPiStatus } from '@/lib/pi-telemetry';
+import savedFarmDefinitions from '@/data/fields.json';
 
 const STORAGE_KEY = 'smartfarm_saved_fields';
 const ACTIVE_FIELD_KEY = 'smartfarm_active_field_id';
+const VERIFIED_HARDWARE_FIELD_ID = 'field-101';
 
 const DEFAULT_FIELDS: FarmField[] = [
   {
@@ -76,6 +78,7 @@ export default function SmartFarmDashboard() {
   const [activeField, setActiveField] = useState<FarmField | null>(null);
   const [backendReady, setBackendReady] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [usingVerifiedFieldFallback, setUsingVerifiedFieldFallback] = useState(false);
 
   // Live status states
   const [isCommandPending, setIsCommandPending] = useState<boolean>(false);
@@ -95,13 +98,30 @@ export default function SmartFarmDashboard() {
     fetch(`${backendUrl}/api/fields`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Pi farm list returned HTTP ${res.status}`);
-        const fields = await res.json();
-        if (!Array.isArray(fields) || fields.length === 0) throw new Error('Pi has no configured farms');
-        return fields.map(mapPiField);
+        let fields = await res.json();
+        if (!Array.isArray(fields)) throw new Error('Pi returned an invalid farm list');
+        let usingFallback = false;
+        if (fields.length === 0) {
+          const fallback = (savedFarmDefinitions as unknown as Parameters<typeof mapPiField>[0][])
+            .find((field) => field.id === VERIFIED_HARDWARE_FIELD_ID);
+          if (!fallback) throw new Error('Pi has no configured farms');
+          const statusResponse = await fetch(
+            `${backendUrl}/api/status?farm_id=${encodeURIComponent(VERIFIED_HARDWARE_FIELD_ID)}`,
+            { cache: 'no-store', signal: AbortSignal.timeout(8000) },
+          );
+          const status = await statusResponse.json();
+          if (!statusResponse.ok || !hasVerifiedLiveArduinoStatus(status, VERIFIED_HARDWARE_FIELD_ID)) {
+            throw new Error('Pi has no configured farms or verified live Arduino data');
+          }
+          fields = [fallback];
+          usingFallback = true;
+        }
+        return { fields: fields.map(mapPiField), usingFallback };
       })
-      .then((fields: FarmField[]) => {
+      .then(({ fields, usingFallback }: { fields: FarmField[]; usingFallback: boolean }) => {
         if (cancelled) return;
         setSavedFields(fields);
+        setUsingVerifiedFieldFallback(usingFallback);
         const savedId = localStorage.getItem(ACTIVE_FIELD_KEY);
         setActiveField(fields.find((field) => field.id === savedId) || fields[0]);
       })
@@ -481,6 +501,11 @@ export default function SmartFarmDashboard() {
               : ' • Live Arduino sensor data is active'}.
           </div>
         )}
+        {usingVerifiedFieldFallback && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Pi farm settings need restoring. Showing the saved field only while its live Arduino connection is verified.
+          </div>
+        )}
         {/* Offline notice if gateway is disconnected */}
         {telemetry.device.is_stale && !isDemoMode && (
           <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-xs flex items-center justify-between">
@@ -570,7 +595,7 @@ export default function SmartFarmDashboard() {
             onSelectField={handleSelectField}
             onDeleteField={handleDeleteField}
             readOnly={!isDemoMode}
-            canDelete={!isDemoMode}
+            canDelete={!isDemoMode && !usingVerifiedFieldFallback}
             onAddNewField={() => {
               const el = document.getElementById('btn-add-field');
               if (el) {
